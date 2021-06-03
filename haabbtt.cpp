@@ -62,26 +62,44 @@ int main(int argc, char** argv) {
     using ch::syst::process;
     using ch::JoinStr;
     
-    // Normalization uncertainties
+    // =========================== Normalization uncertainties ===========================
     // The AddSyst method supports {$BIN, $PROCESS, $MASS, $ERA, $CHANNEL, $ANALYSIS}
     cb.cp().process({"ggh_htt","qqh_htt","Zh_htt","Wh_htt"}).AddSyst(cb, "CMS_htt_BR", "lnN", SystMap<>::init(1.018));
     cb.cp().process({"ggh_hww","qqh_hww","Zh_hww","Wh_hww"}).AddSyst(cb, "CMS_hww_BR", "lnN", SystMap<>::init(1.015));
     cb.cp().process(JoinStr({{"ggh_htt","ggh_hww"},sig_ggh})).AddSyst(cb, "pdf_Higgs_gg", "lnN", SystMap<>::init(1.032));
     cb.cp().process(JoinStr({{"qqh_htt","qqh_hww"},sig_vbf})).AddSyst(cb, "pdf_Higgs_qq", "lnN", SystMap<>::init(1.021));
-    cb.cp().process(JoinStr({{"ttbar","ST","tth"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_btagging", "lnN", SystMap<>::init(1.05));
     cb.cp().process({"ZJ"}).AddSyst(cb, "CMS_normalization_Z_13TeV", "lnN", SystMap<>::init(1.02));
     cb.cp().process({"ttbar"}).AddSyst(cb, "CMS_ttbar_xs", "lnN", SystMap<>::init(1.042));
     cb.cp().process({"VV"}).AddSyst(cb, "CMS_VV_xs", "lnN", SystMap<>::init(1.05));
     cb.cp().process({"ST"}).AddSyst(cb, "CMS_ST_xs", "lnN", SystMap<>::init(1.05));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "lumi_13TeV", "lnN", SystMap<>::init(1.025));// no embedded
     cb.cp().process({"embedded"}).AddSyst(cb, "CMS_normalization_embedded_13TeV", "lnN", SystMap<>::init(1.04));
+    // Luminosity uncertainties, no embedded
+    if (year=="2016"){
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "lumi_13TeV_2016", "lnN", SystMap<>::init(1.01));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "lumi_13TeV_correlated16-18", "lnN", SystMap<>::init(1.006));
+    }
+    if (year=="2017"){
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "lumi_13TeV_2017", "lnN", SystMap<>::init(1.02));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "lumi_13TeV_correlated16-18", "lnN", SystMap<>::init(1.009));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "lumi_13TeV_correlated17-18", "lnN", SystMap<>::init(1.006));
+    }
+    if (year=="2018"){
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "lumi_13TeV_2018", "lnN", SystMap<>::init(1.015));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "lumi_13TeV_correlated16-18", "lnN", SystMap<>::init(1.02));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "lumi_13TeV_correlated17-18", "lnN", SystMap<>::init(1.002));
+    }
     
     if (channel=="em"){
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_eleID_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_muID_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_emutrg_13TeV", "lnN", SystMap<>::init(1.02));
-        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_eleID_13TeV", "lnN", SystMap<>::init(1.02));
-        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_muID_13TeV", "lnN", SystMap<>::init(1.02));
+        // eleID 50% correlated with MC
+        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_eleID_13TeV", "lnN", SystMap<>::init(1.01));// 2% * 50%
+        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_eleID_13TeV", "lnN", SystMap<>::init(1.01732));// 2% * sqrt(1-50%^2)
+        // muID 50% correlated with MC
+        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_muID_13TeV", "lnN", SystMap<>::init(1.01));
+        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_muID_13TeV", "lnN", SystMap<>::init(1.01732));
+        
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_emutrg_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process({"fake"}).AddSyst(cb, "CMS_normalization_qcd_13TeV", "lnN", SystMap<>::init(1.20));
     }
@@ -89,7 +107,10 @@ int main(int argc, char** argv) {
     if (channel=="et"){
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_eleID_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_etrg_13TeV", "lnN", SystMap<>::init(1.02));
-        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_eleID_13TeV", "lnN", SystMap<>::init(1.02));
+        // eleID 50% correlated with MC
+        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_eleID_13TeV", "lnN", SystMap<>::init(1.01));
+        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_eleID_13TeV", "lnN", SystMap<>::init(1.01732));
+        
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_etrg_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process({"ZJ"}).AddSyst(cb, "CMS_Z_misID_13TeV", "lnN", SystMap<>::init(1.20));
         cb.cp().process({"fake"}).AddSyst(cb, "CMS_normalization_fake_13TeV", "lnN", SystMap<>::init(1.20));
@@ -98,13 +119,16 @@ int main(int argc, char** argv) {
     if (channel=="mt"){
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_muID_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_mutrg_13TeV", "lnN", SystMap<>::init(1.02));
-        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_muID_13TeV", "lnN", SystMap<>::init(1.02));
+        // muID 50% correlated with MC
+        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_muID_13TeV", "lnN", SystMap<>::init(1.01));
+        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_muID_13TeV", "lnN", SystMap<>::init(1.01732));
+        
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_mutrg_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process({"ZJ"}).AddSyst(cb, "CMS_Z_misID_13TeV", "lnN", SystMap<>::init(1.20));
         cb.cp().process({"fake"}).AddSyst(cb, "CMS_normalization_fake_13TeV", "lnN", SystMap<>::init(1.20));
     }
     
-    // Shape uncertainties
+    // =========================== Shape uncertainties ===========================
     // The AddSyst method supports {$BIN, $PROCESS, $MASS, $ERA, $CHANNEL, $ANALYSIS}
     
     // btagging efficiency, no embedded
@@ -113,18 +137,25 @@ int main(int argc, char** argv) {
     
     // Trigger efficiency
     if (channel=="et" or channel=="mt"){
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_single_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_cross_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded","fake"}).AddSyst(cb,"CMS_EMB_trgeff_single_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded","fake"}).AddSyst(cb,"CMS_EMB_trgeff_cross_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_single_$CHANNEL_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_cross_$CHANNEL_$ERA", "shape", SystMap<>::init(1.00));
+        // 50% correlated with MC
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_trgeff_single_$CHANNEL_$ERA", "shape", SystMap<>::init(0.50));// 1.00 * 50%
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_trgeff_cross_$CHANNEL_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_trgeff_single_$CHANNEL_$ERA", "shape", SystMap<>::init(0.866));// 1.00 * sqrt(1-50%^2)
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_trgeff_cross_$CHANNEL_$ERA", "shape", SystMap<>::init(0.866));
     }
     if (channel=="em"){
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_Mu8E23_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_Mu23E12_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_both_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded","fake"}).AddSyst(cb,"CMS_EMB_trgeff_Mu8E23_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded","fake"}).AddSyst(cb,"CMS_EMB_trgeff_Mu23E12_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded","fake"}).AddSyst(cb,"CMS_EMB_trgeff_both_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_Mu8E23_$CHANNEL_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_Mu23E12_$CHANNEL_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_both_$CHANNEL_$ERA", "shape", SystMap<>::init(1.00));
+        // 50% correlated with MC
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_trgeff_Mu8E23_$CHANNEL_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_trgeff_Mu23E12_$CHANNEL_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_trgeff_both_$CHANNEL_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_trgeff_Mu8E23_$CHANNEL_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_trgeff_Mu23E12_$CHANNEL_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_trgeff_both_$CHANNEL_$ERA", "shape", SystMap<>::init(0.866));
     }
     
     // tau related corrections, no fake bkg
@@ -137,13 +168,21 @@ int main(int argc, char** argv) {
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_pt40to500_$ERA", "shape", SystMap<>::init(1.00));
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_pt500to1000_$ERA", "shape", SystMap<>::init(1.00));
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_ptgt1000_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt20to25_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt25to30_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt30to35_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt35to40_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt40to500_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt500to1000_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_ptgt1000_$ERA", "shape", SystMap<>::init(1.00));
+        // 50% correlated with MC
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt20to25_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt25to30_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt30to35_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt35to40_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt40to500_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt500to1000_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_ptgt1000_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt20to25_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt25to30_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt30to35_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt35to40_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt40to500_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt500to1000_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_ptgt1000_$ERA", "shape", SystMap<>::init(0.866));
         
         // tau ID efficiency (VSe), no anti-lepton in embedded
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_VSe_bar_$ERA", "shape", SystMap<>::init(1.00));
@@ -161,10 +200,15 @@ int main(int argc, char** argv) {
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_TES_dm1_$ERA", "shape", SystMap<>::init(1.00));
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_TES_dm10_$ERA", "shape", SystMap<>::init(1.00));
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_TES_dm11_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm0_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm1_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm10_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm11_$ERA", "shape", SystMap<>::init(1.00));
+        // 50% correlated with MC
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_TES_dm0_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_TES_dm1_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_TES_dm10_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_TES_dm11_$ERA", "shape", SystMap<>::init(0.50));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm0_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm1_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm10_$ERA", "shape", SystMap<>::init(0.866));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm11_$ERA", "shape", SystMap<>::init(0.866));
         
         // tau ES (ele fake), no embedded
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_eleTES_dm0_$ERA", "shape", SystMap<>::init(1.00));
@@ -189,18 +233,18 @@ int main(int argc, char** argv) {
     }
     
     // JES, no embedded
+    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetAbsolute", "shape", SystMap<>::init(1.00));
     cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetAbsolute_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetAbsoluteyear_$ERA", "shape", SystMap<>::init(1.00));
+    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetBBEC1", "shape", SystMap<>::init(1.00));
     cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetBBEC1_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetBBEC1year_$ERA", "shape", SystMap<>::init(1.00));
+    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetEC2", "shape", SystMap<>::init(1.00));
     cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetEC2_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetEC2year_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetFlavorQCD_$ERA", "shape", SystMap<>::init(1.00));
+    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetFlavorQCD", "shape", SystMap<>::init(1.00));
+    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetHF", "shape", SystMap<>::init(1.00));
     cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetHF_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetHFyear_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetRelativeBal_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetRelativeSample_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JER_$ERA", "shape", SystMap<>::init(1.00));
+    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetRelativeBal", "shape", SystMap<>::init(1.00));
+    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetRelativeSample", "shape", SystMap<>::init(1.00));
+    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JER", "shape", SystMap<>::init(1.00));
     
     // recoil correction, for Z+jets, W+jets, ggh and qqh (no W+jets in e+tau and mu+tau)
     // UES uncertainties, for MC without recoil correction
@@ -230,9 +274,11 @@ int main(int argc, char** argv) {
     cb.cp().process({"ttbar","fake"}).AddSyst(cb,"CMS_toppt_$ERA", "shape", SystMap<>::init(1.00));
     
     // tau tracking efficiency in embedded
-    cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm0dm10_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm1_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm11_$ERA", "shape", SystMap<>::init(1.00));
+    if (channel=="et" or channel=="mt"){
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm0dm10_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm1_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm11_$ERA", "shape", SystMap<>::init(1.00));
+    }
     
     // Non-DY MC contamination to embedded
     cb.cp().process({"embedded"}).AddSyst(cb,"CMS_nonDY_$ERA", "shape", SystMap<>::init(1.00));
