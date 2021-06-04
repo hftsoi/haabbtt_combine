@@ -92,7 +92,6 @@ int main(int argc, char** argv) {
     if (channel=="em"){
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_eleID_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_muID_13TeV", "lnN", SystMap<>::init(1.02));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_emutrg_13TeV", "lnN", SystMap<>::init(1.02));
         // eleID 50% correlated with MC
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_eleID_13TeV", "lnN", SystMap<>::init(1.01));// 2% * 50%
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_eleID_13TeV", "lnN", SystMap<>::init(1.01732));// 2% * sqrt(1-50%^2)
@@ -100,30 +99,25 @@ int main(int argc, char** argv) {
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_muID_13TeV", "lnN", SystMap<>::init(1.01));
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_muID_13TeV", "lnN", SystMap<>::init(1.01732));
         
-        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_emutrg_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process({"fake"}).AddSyst(cb, "CMS_normalization_qcd_13TeV", "lnN", SystMap<>::init(1.20));
     }
     
     if (channel=="et"){
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_eleID_13TeV", "lnN", SystMap<>::init(1.02));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_etrg_13TeV", "lnN", SystMap<>::init(1.02));
         // eleID 50% correlated with MC
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_eleID_13TeV", "lnN", SystMap<>::init(1.01));
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_eleID_13TeV", "lnN", SystMap<>::init(1.01732));
         
-        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_etrg_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process({"ZJ"}).AddSyst(cb, "CMS_Z_misID_13TeV", "lnN", SystMap<>::init(1.20));
         cb.cp().process({"fake"}).AddSyst(cb, "CMS_normalization_fake_13TeV", "lnN", SystMap<>::init(1.20));
     }
     
     if (channel=="mt"){
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_muID_13TeV", "lnN", SystMap<>::init(1.02));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb, "CMS_mutrg_13TeV", "lnN", SystMap<>::init(1.02));
         // muID 50% correlated with MC
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_muID_13TeV", "lnN", SystMap<>::init(1.01));
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_muID_13TeV", "lnN", SystMap<>::init(1.01732));
         
-        cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_mutrg_13TeV", "lnN", SystMap<>::init(1.02));
         cb.cp().process({"ZJ"}).AddSyst(cb, "CMS_Z_misID_13TeV", "lnN", SystMap<>::init(1.20));
         cb.cp().process({"fake"}).AddSyst(cb, "CMS_normalization_fake_13TeV", "lnN", SystMap<>::init(1.20));
     }
@@ -219,17 +213,22 @@ int main(int argc, char** argv) {
         cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muTES_dm1_$ERA", "shape", SystMap<>::init(1.00));
     }
     
-    // Leptons ES
+    // Leptons ES (MC and embedded are fully uncorrelated)
     if (channel=="et" or channel=="em"){
         // ele ES
-        cb.cp().process(JoinStr({bkg_procs,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_eleES_bar_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_eleES_end_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_eleES_bar_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_eleES_end_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_eleES_bar_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_eleES_end_$ERA", "shape", SystMap<>::init(1.00));
     }
     if (channel=="mt" or channel=="em"){
         // mu ES
-        cb.cp().process(JoinStr({bkg_procs,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muES_eta0to1p2_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muES_eta1p2to2p1_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muES_eta2p1to2p4_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muES_eta0to1p2_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muES_eta1p2to2p1_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muES_eta2p1to2p4_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_muES_eta0to1p2_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_muES_eta1p2to2p1_$ERA", "shape", SystMap<>::init(1.00));
+        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_muES_eta2p1to2p4_$ERA", "shape", SystMap<>::init(1.00));
     }
     
     // JES, no embedded
@@ -273,14 +272,14 @@ int main(int argc, char** argv) {
     // top pt reweighting
     cb.cp().process({"ttbar","fake"}).AddSyst(cb,"CMS_toppt_$ERA", "shape", SystMap<>::init(1.00));
     
-    // tau tracking efficiency in embedded
+    // tau tracking efficiency in embedded (on real tauh, no effect on fake bkg)
     if (channel=="et" or channel=="mt"){
         cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm0dm10_$ERA", "shape", SystMap<>::init(1.00));
         cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm1_$ERA", "shape", SystMap<>::init(1.00));
         cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm11_$ERA", "shape", SystMap<>::init(1.00));
     }
     
-    // Non-DY MC contamination to embedded
+    // Non-DY MC contamination to embedded (selected from taus, no effect on fake bkg)
     cb.cp().process({"embedded"}).AddSyst(cb,"CMS_nonDY_$ERA", "shape", SystMap<>::init(1.00));
     
     // Reducible background estimation
