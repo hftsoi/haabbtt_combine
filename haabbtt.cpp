@@ -14,6 +14,73 @@
 
 using namespace std;
 
+// Add shape unc only when template norms are positive
+// and when there are no negative bins in both Up and Down shapes
+// e.g. diboson has some negative genweights, fake estimation involves data/MC subtraction...
+void addshapes(ch::CombineHarvester* cb, TFile* input_file, ch::Categories categories, vector<string> proc_names, string syst_name, float init_value) {
+    // Loop over categories
+    for (auto categories_itn = categories.begin(); categories_itn != categories.end(); ++categories_itn) {
+        string category_name = categories_itn->second;// ch::Categories is of the type vector<pair<int, string>>
+        TDirectory* dir = (TDirectory*) input_file->Get(category_name.c_str());
+        if (dir == nullptr) {
+            cout << "Warning: category " << category_name << " missing in file!" << endl;
+            throw;
+        }
+        // Loop over the given processes
+        for (auto proc_names_itn = proc_names.begin(); proc_names_itn != proc_names.end(); ++proc_names_itn) {
+            TH1F* shapeBase = (TH1F*) dir->Get((*proc_names_itn).c_str());
+            TH1F* shapeUp = (TH1F*) dir->Get((*proc_names_itn + "_" + syst_name + "Up").c_str());
+            TH1F* shapeDown = (TH1F*) dir->Get((*proc_names_itn + "_" + syst_name + "Down").c_str());
+            // Check if each of the given processes has at least the shape templates in file
+            // They could be invalid for use but must be there if passed in argument
+            if (shapeBase == nullptr) {
+                cout << "Warning: the nominal process shape " << *proc_names_itn << " in category " << category_name << " does not exist!" << endl;
+                throw;
+            }
+            if (shapeUp == nullptr) {
+                cout << "Warning: the Up shape " << *proc_names_itn << "_" << syst_name << "Up" << " in category " << category_name << " does not exist!" << endl;
+                throw;
+            }
+            if (shapeDown == nullptr) {
+                cout << "Warning: the Down shape " << *proc_names_itn << "_" << syst_name << "Down" << " in category " << category_name << " does not exist!" << endl;
+                throw;
+            }
+            // Check if the template shapes have positive norms
+            Float_t shapeBase_norm = 0.0;
+            Float_t shapeUp_norm = 0.0;
+            Float_t shapeDown_norm = 0.0;
+            shapeBase_norm = shapeBase->Integral();
+            shapeUp_norm = shapeUp->Integral();
+            shapeDown_norm = shapeDown->Integral();
+            bool HasPositiveNorms = shapeBase_norm > 0.0 and shapeUp_norm > 0.0 and shapeDown_norm > 0.0;
+            
+            //Check if the Up and Down shapes have any negative bin
+            bool shapeUp_negativebins = false;
+            bool shapeDown_negativebins = false;
+            for (int i = 1; i <= shapeUp->GetNbinsX(); ++i) {
+                if (shapeUp->GetBinContent(i) < 0.0) shapeUp_negativebins = true;
+            }
+            for (int i = 1; i <= shapeDown->GetNbinsX(); ++i) {
+                if (shapeDown->GetBinContent(i) < 0.0) shapeDown_negativebins = true;
+            }
+            bool HasNegativeBins = shapeUp_negativebins or shapeDown_negativebins;
+            
+            if (HasPositiveNorms and !HasNegativeBins) {
+                cb->cp().bin({category_name}).process({*proc_names_itn}).AddSyst(*cb, syst_name, "shape", ch::syst::SystMap<>::init(init_value));
+            }
+            else if (!HasPositiveNorms and !HasNegativeBins) {
+                cout << "Skipping shape with non-positive norms: " << syst_name << " for process " << *proc_names_itn << " in category " << category_name << endl;
+            }
+            else if (HasPositiveNorms and HasNegativeBins) {
+                cout << "Skipping shape with negative bins: " << syst_name << " for process " << *proc_names_itn << " in category " << category_name << endl;
+            }
+            else {
+                cout << "Skipping shape with both non-positive norms and negative bins: " << syst_name << " for process " << *proc_names_itn << " in category " << category_name << endl;
+            }
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     
     std::string channel = *(argv + 1);
@@ -28,12 +95,18 @@ int main(int argc, char** argv) {
     
     // List of categories (also called 'bins' in Combine)
     ch::Categories cats = {
-        {1, "m_tt_1b"},
-        {2, "m_tt_2b"}
+        {1, "1"},
+        {2, "2"},
+        {3, "3"},
+        {4, "4"},
+        {5, "5"},
+        {6, "6"}
     };
+    if (channel=="em" or channel=="mt") cats.push_back({7, "7"});
     
     // List of mass points for the signal, the masses are added at the end of the signal string names
-    vector<string> masses = {"12","15","20","25","30","35","40","45","50","55","60"};
+    //vector<string> masses = {"12","15","20","25","30","35","40","45","50","55","60"};
+    vector<string> masses = {"35"};
     
     // Observed data (name must be "data_obs" in datacards)
     cb.AddObservations({"*"}, {"haabbtt"}, {year}, {channel}, cats);
@@ -43,7 +116,7 @@ int main(int argc, char** argv) {
     if (channel=="em") bkg_procs.push_back("WJ");
     
     vector<string> bkg_procs_noEMB_nofake = bkg_procs;
-    
+
     bkg_procs.push_back("embedded");
     bkg_procs.push_back("fake");
     
@@ -53,8 +126,14 @@ int main(int argc, char** argv) {
     vector<string> sig_procs = {"gghbbtt","vbfbbtt"};
     cb.AddProcesses(masses, {"haabbtt"}, {year}, {channel}, sig_procs, cats, true);
     
-    vector<string> sig_ggh = {"gghbbtt12","gghbbtt15","gghbbtt20","gghbbtt25","gghbbtt30","gghbbtt35","gghbbtt40","gghbbtt45","gghbbtt50","gghbbtt55","gghbbtt60"};
-    vector<string> sig_vbf = {"vbfbbtt12","vbfbbtt15","vbfbbtt20","vbfbbtt25","vbfbbtt30","vbfbbtt35","vbfbbtt40","vbfbbtt45","vbfbbtt50","vbfbbtt55","vbfbbtt60"};
+    //vector<string> sig_ggh = {"gghbbtt12","gghbbtt15","gghbbtt20","gghbbtt25","gghbbtt30","gghbbtt35","gghbbtt40","gghbbtt45","gghbbtt50","gghbbtt55","gghbbtt60"};
+    //vector<string> sig_vbf = {"vbfbbtt12","vbfbbtt15","vbfbbtt20","vbfbbtt25","vbfbbtt30","vbfbbtt35","vbfbbtt40","vbfbbtt45","vbfbbtt50","vbfbbtt55","vbfbbtt60"};
+    //if (channel=="em" /*or channel=="et" or channel=="mt"*/){
+    //    sig_ggh.push_back("gghbbtt12");
+    //    sig_vbf.push_back("vbfbbtt12");
+    //}
+    vector<string> sig_ggh = {"gghbbtt35"};
+    vector<string> sig_vbf = {"vbfbbtt35"};
     
     using ch::syst::SystMap;
     using ch::syst::era;
@@ -108,7 +187,6 @@ int main(int argc, char** argv) {
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_eleID_13TeV", "lnN", SystMap<>::init(1.01));
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_eleID_13TeV", "lnN", SystMap<>::init(1.01732));
         
-        cb.cp().process({"ZJ"}).AddSyst(cb, "CMS_Z_misID_13TeV", "lnN", SystMap<>::init(1.20));
         cb.cp().process({"fake"}).AddSyst(cb, "CMS_normalization_fake_13TeV", "lnN", SystMap<>::init(1.20));
     }
     
@@ -118,188 +196,201 @@ int main(int argc, char** argv) {
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_muID_13TeV", "lnN", SystMap<>::init(1.01));
         cb.cp().process({"embedded"}).AddSyst(cb, "CMS_EMB_muID_13TeV", "lnN", SystMap<>::init(1.01732));
         
-        cb.cp().process({"ZJ"}).AddSyst(cb, "CMS_Z_misID_13TeV", "lnN", SystMap<>::init(1.20));
         cb.cp().process({"fake"}).AddSyst(cb, "CMS_normalization_fake_13TeV", "lnN", SystMap<>::init(1.20));
     }
     
     // =========================== Shape uncertainties ===========================
     // The AddSyst method supports {$BIN, $PROCESS, $MASS, $ERA, $CHANNEL, $ANALYSIS}
     
+    TFile* file;
+    file = new TFile((aux_shapes+"final_"+channel+"_"+year+".root").c_str());// To be used for the addshapes function
+    
     // btagging efficiency, no embedded
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_btagsf_heavy_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_btagsf_light_$ERA", "shape", SystMap<>::init(1.00));
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_heavy_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_light_"+year, 1.00);
     
     // Trigger efficiency
     if (channel=="et" or channel=="mt"){
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_single_$CHANNEL_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_cross_$CHANNEL_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_trgeff_single_"+channel+"_"+year, 1.00);
         // 50% correlated with MC
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_trgeff_single_$CHANNEL_$ERA", "shape", SystMap<>::init(0.50));// 1.00 * 50%
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_trgeff_cross_$CHANNEL_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_trgeff_single_$CHANNEL_$ERA", "shape", SystMap<>::init(0.866));// 1.00 * sqrt(1-50%^2)
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_trgeff_cross_$CHANNEL_$ERA", "shape", SystMap<>::init(0.866));
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_trgeff_single_"+channel+"_"+year, 0.50);// 1.00 * 50%
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_trgeff_single_"+channel+"_"+year, 0.866);// 1.00 * sqrt(1-50%^2)
+        if (channel=="mt" or (channel=="et" && year!="2016")){
+            addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_trgeff_cross_"+channel+"_"+year, 1.00);
+            addshapes(&cb, file, cats, {"embedded"}, "CMS_trgeff_cross_"+channel+"_"+year, 0.50);
+            addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_trgeff_cross_"+channel+"_"+year, 0.866);
+        }
     }
     if (channel=="em"){
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_Mu8E23_$CHANNEL_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_Mu23E12_$CHANNEL_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_trgeff_both_$CHANNEL_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_trgeff_Mu8E23_"+channel+"_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_trgeff_Mu23E12_"+channel+"_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_trgeff_both_"+channel+"_"+year, 1.00);
         // 50% correlated with MC
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_trgeff_Mu8E23_$CHANNEL_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_trgeff_Mu23E12_$CHANNEL_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_trgeff_both_$CHANNEL_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_trgeff_Mu8E23_$CHANNEL_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_trgeff_Mu23E12_$CHANNEL_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_trgeff_both_$CHANNEL_$ERA", "shape", SystMap<>::init(0.866));
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_trgeff_Mu8E23_"+channel+"_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_trgeff_Mu23E12_"+channel+"_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_trgeff_both_"+channel+"_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_trgeff_Mu8E23_"+channel+"_"+year, 0.866);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_trgeff_Mu23E12_"+channel+"_"+year, 0.866);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_trgeff_both_"+channel+"_"+year, 0.866);
     }
     
     // tau related corrections, no fake bkg
     if (channel=="et" or channel=="mt"){
         // tau ID efficiency (VSjet)
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_pt20to25_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_pt25to30_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_pt30to35_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_pt35to40_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_pt40to500_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_pt500to1000_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_ptgt1000_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_pt20to25_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_pt25to30_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_pt30to35_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_pt35to40_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_pt40to500_"+year, 1.00);
+        //addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_pt500to1000_"+year, 1.00);
+        //addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_ptgt1000_"+year, 1.00);
+        
         // 50% correlated with MC
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt20to25_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt25to30_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt30to35_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt35to40_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt40to500_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_pt500to1000_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_tauideff_ptgt1000_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt20to25_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt25to30_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt30to35_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt35to40_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt40to500_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_pt500to1000_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tauideff_ptgt1000_$ERA", "shape", SystMap<>::init(0.866));
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_tauideff_pt20to25_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_tauideff_pt25to30_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_tauideff_pt30to35_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_tauideff_pt35to40_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_tauideff_pt40to500_"+year, 0.50);
+        //addshapes(&cb, file, cats, {"embedded"}, "CMS_tauideff_pt500to1000_"+year, 0.50);
+        //addshapes(&cb, file, cats, {"embedded"}, "CMS_tauideff_ptgt1000_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tauideff_pt20to25_"+year, 0.866);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tauideff_pt25to30_"+year, 0.866);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tauideff_pt30to35_"+year, 0.866);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tauideff_pt35to40_"+year, 0.866);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tauideff_pt40to500_"+year, 0.866);
+        //addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tauideff_pt500to1000_"+year, 0.866);
+        //addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tauideff_ptgt1000_"+year, 0.866);
         
         // tau ID efficiency (VSe), no anti-lepton in embedded
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_VSe_bar_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_VSe_end_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_VSe_bar_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_VSe_end_"+year, 1.00);
         
         // tau ID efficiency (VSmu), no anti-lepton in embedded
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_VSmu_eta0to0p4_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_VSmu_eta0p4to0p8_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_VSmu_eta0p8to1p2_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_VSmu_eta1p2to1p7_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_tauideff_VSmu_eta1p7to2p3_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_VSmu_eta0to0p4_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_VSmu_eta0p4to0p8_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_VSmu_eta0p8to1p2_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_VSmu_eta1p2to1p7_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauideff_VSmu_eta1p7to2p3_"+year, 1.00);
         
         // tau ES
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_TES_dm0_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_TES_dm1_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_TES_dm10_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_TES_dm11_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_TES_dm0_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_TES_dm1_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_TES_dm10_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_TES_dm11_"+year, 1.00);
         // 50% correlated with MC
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_TES_dm0_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_TES_dm1_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_TES_dm10_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_TES_dm11_$ERA", "shape", SystMap<>::init(0.50));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm0_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm1_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm10_$ERA", "shape", SystMap<>::init(0.866));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_TES_dm11_$ERA", "shape", SystMap<>::init(0.866));
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_TES_dm0_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_TES_dm1_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_TES_dm10_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_TES_dm11_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_TES_dm0_"+year, 0.866);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_TES_dm1_"+year, 0.866);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_TES_dm10_"+year, 0.866);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_TES_dm11_"+year, 0.866);
         
         // tau ES (ele fake), no embedded
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_eleTES_dm0_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_eleTES_dm1_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_eleTES_dm0_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_eleTES_dm1_"+year, 1.00);
         
         // tau ES (mu fake), no embedded
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muTES_dm0_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muTES_dm1_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_muTES_dm0_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_muTES_dm1_"+year, 1.00);
+    }
+    
+    // Tau ID efficiency with different WP than used in measurement, for e+tau only
+    if (channel=="et"){
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,sig_ggh,sig_vbf}), "CMS_tauidWP_et_"+year, 1.00);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_tauidWP_et_"+year, 0.50);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tauidWP_et_"+year, 0.866);
     }
     
     // Leptons ES (MC and embedded are fully uncorrelated)
     if (channel=="et" or channel=="em"){
         // ele ES
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_eleES_bar_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_eleES_end_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_eleES_bar_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_eleES_end_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_eleES_bar_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_eleES_end_"+year, 1.00);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_eleES_bar_"+year, 1.00);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_eleES_end_"+year, 1.00);
     }
     if (channel=="mt" or channel=="em"){
         // mu ES
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muES_eta0to1p2_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muES_eta1p2to2p1_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_muES_eta2p1to2p4_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_muES_eta0to1p2_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_muES_eta1p2to2p1_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_muES_eta2p1to2p4_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_muES_eta0to1p2_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_muES_eta1p2to2p1_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_muES_eta2p1to2p4_"+year, 1.00);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_muES_eta0to1p2_"+year, 1.00);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_muES_eta1p2to2p1_"+year, 1.00);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_muES_eta2p1to2p4_"+year, 1.00);
     }
     
     // JES, no embedded
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetAbsolute", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetAbsolute_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetBBEC1", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetBBEC1_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetEC2", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetEC2_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetFlavorQCD", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetHF", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetHF_$ERA", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetRelativeBal", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JetRelativeSample", "shape", SystMap<>::init(1.00));
-    cb.cp().process(JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_JER", "shape", SystMap<>::init(1.00));
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetAbsolute", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetAbsolute_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetBBEC1", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetBBEC1_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetEC2", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetEC2_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetFlavorQCD", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetHF", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetHF_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetRelativeBal", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetRelativeSample", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JER", 1.00);
     
     // recoil correction, for Z+jets, W+jets, ggh and qqh (no W+jets in e+tau and mu+tau)
     // UES uncertainties, for MC without recoil correction
     if (channel=="et" or channel=="mt"){
-        cb.cp().process(JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_0j_resolution_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_0j_response_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_1j_resolution_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_1j_response_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_gt1j_resolution_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_gt1j_response_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"ttbar","ST","VV","Zh_htt","Zh_hww","Wh_htt","Wh_hww","tth","fake"}).AddSyst(cb,"CMS_UES_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_0j_resolution_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_0j_response_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_1j_resolution_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_1j_response_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_gt1j_resolution_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_gt1j_response_"+year, 1.00);
+        addshapes(&cb, file, cats, {"ttbar","ST","VV","Zh_htt","Zh_hww","Wh_htt","Wh_hww","tth","fake"}, "CMS_UES_"+year, 1.00);
     }
     if (channel=="em"){
-        cb.cp().process(JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_0j_resolution_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_0j_response_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_1j_resolution_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_1j_response_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_gt1j_resolution_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process(JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf})).AddSyst(cb,"CMS_gt1j_response_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"ttbar","ST","VV","Zh_htt","Zh_hww","Wh_htt","Wh_hww","tth","fake"}).AddSyst(cb,"CMS_UES_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_0j_resolution_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_0j_response_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_1j_resolution_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_1j_response_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_gt1j_resolution_"+year, 1.00);
+        addshapes(&cb, file, cats, JoinStr({{"ZJ","WJ","ggh_htt","ggh_hww","qqh_htt","qqh_hww","fake"},sig_ggh,sig_vbf}), "CMS_gt1j_response_"+year, 1.00);
+        addshapes(&cb, file, cats, {"ttbar","ST","VV","Zh_htt","Zh_hww","Wh_htt","Wh_hww","tth","fake"}, "CMS_UES_"+year, 1.00);
     }
     
     // Z pt reweighting
-    cb.cp().process({"ZJ","fake"}).AddSyst(cb,"CMS_Zpt_$ERA", "shape", SystMap<>::init(1.00));
+    addshapes(&cb, file, cats, {"ZJ","fake"}, "CMS_Zpt_"+year, 1.00);
     
     // top pt reweighting
-    cb.cp().process({"ttbar","fake"}).AddSyst(cb,"CMS_toppt_$ERA", "shape", SystMap<>::init(1.00));
+    addshapes(&cb, file, cats, {"ttbar","fake"}, "CMS_toppt_"+year, 1.00);
     
     // tau tracking efficiency in embedded (on real tauh, no effect on fake bkg)
     if (channel=="et" or channel=="mt"){
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm0dm10_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm1_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"embedded"}).AddSyst(cb,"CMS_EMB_tautrack_dm11_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tautrack_dm0dm10_"+year, 1.00);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tautrack_dm1_"+year, 1.00);
+        addshapes(&cb, file, cats, {"embedded"}, "CMS_EMB_tautrack_dm11_"+year, 1.00);
     }
     
     // Non-DY MC contamination to embedded (selected from taus, no effect on fake bkg)
-    cb.cp().process({"embedded"}).AddSyst(cb,"CMS_nonDY_$ERA", "shape", SystMap<>::init(1.00));
+    addshapes(&cb, file, cats, {"embedded"}, "CMS_nonDY_"+year, 1.00);
     
     // Reducible background estimation
     if (channel=="et" or channel=="mt"){
         // fake factor for cross triggered events
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_crosstrg_fakefactor_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, {"fake"}, "CMS_crosstrg_fakefactor_"+year, 1.00);
         // fake rate measurement
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_jetFR_pt0to25_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_jetFR_pt25to30_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_jetFR_pt30to35_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_jetFR_pt35to40_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_jetFR_pt40to50_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_jetFR_pt50to60_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_jetFR_ptgt60_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, {"fake"}, "CMS_jetFR_pt0to25_"+year, 1.00);
+        addshapes(&cb, file, cats, {"fake"}, "CMS_jetFR_pt25to30_"+year, 1.00);
+        addshapes(&cb, file, cats, {"fake"}, "CMS_jetFR_pt30to35_"+year, 1.00);
+        addshapes(&cb, file, cats, {"fake"}, "CMS_jetFR_pt35to40_"+year, 1.00);
+        addshapes(&cb, file, cats, {"fake"}, "CMS_jetFR_pt40to50_"+year, 1.00);
+        addshapes(&cb, file, cats, {"fake"}, "CMS_jetFR_pt50to60_"+year, 1.00);
+        addshapes(&cb, file, cats, {"fake"}, "CMS_jetFR_ptgt60_"+year, 1.00);
     }
     if (channel=="em"){
         // SS correction and closure
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_SScorrection_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_SSclosure_$ERA", "shape", SystMap<>::init(1.00));
-        cb.cp().process({"fake"}).AddSyst(cb,"CMS_SSboth2D_$ERA", "shape", SystMap<>::init(1.00));
+        addshapes(&cb, file, cats, {"fake"}, "CMS_SScorrection_"+year, 1.00);
+        addshapes(&cb, file, cats, {"fake"}, "CMS_SSclosure_"+year, 1.00);
+        addshapes(&cb, file, cats, {"fake"}, "CMS_SSboth2D_"+year, 1.00);
+        addshapes(&cb, file, cats, {"fake"}, "CMS_osss_"+year, 1.00);
     }
     
     
@@ -329,4 +420,5 @@ int main(int argc, char** argv) {
     }
     
 }
+
 
