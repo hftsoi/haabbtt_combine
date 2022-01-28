@@ -54,7 +54,8 @@ void addshapes(ch::CombineHarvester* cb, TFile* input_file, ch::Categories categ
             shapeDown_norm = shapeDown->Integral();
             bool HasPositiveNorms = shapeBase_norm > 0.0 and shapeUp_norm > 0.0 and shapeDown_norm > 0.0;
             
-            //Check if the Up and Down shapes have any negative bin
+            /* // Negative bins are fine except the shape looks crazy
+            // Check if the Up and Down shapes have any negative bin
             bool shapeUp_negativebins = false;
             bool shapeDown_negativebins = false;
             for (int i = 1; i <= shapeUp->GetNbinsX(); ++i) {
@@ -64,18 +65,13 @@ void addshapes(ch::CombineHarvester* cb, TFile* input_file, ch::Categories categ
                 if (shapeDown->GetBinContent(i) < 0.0) shapeDown_negativebins = true;
             }
             bool HasNegativeBins = shapeUp_negativebins or shapeDown_negativebins;
+            */
             
-            if (HasPositiveNorms and !HasNegativeBins) {
+            if (HasPositiveNorms) {
                 cb->cp().bin({category_name}).process({*proc_names_itn}).AddSyst(*cb, syst_name, "shape", ch::syst::SystMap<>::init(init_value));
             }
-            else if (!HasPositiveNorms and !HasNegativeBins) {
-                cout << "Skipping shape with non-positive norms: " << syst_name << " for process " << *proc_names_itn << " in category " << category_name << endl;
-            }
-            else if (HasPositiveNorms and HasNegativeBins) {
-                cout << "Skipping shape with negative bins: " << syst_name << " for process " << *proc_names_itn << " in category " << category_name << endl;
-            }
             else {
-                cout << "Skipping shape with both non-positive norms and negative bins: " << syst_name << " for process " << *proc_names_itn << " in category " << category_name << endl;
+                cout << "Skipping shape with non-positive norms: " << syst_name << " for process " << *proc_names_itn << " in category " << category_name << endl;
             }
         }
     }
@@ -333,7 +329,7 @@ int main(int argc, char** argv) {
     addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetHF_"+year, 1.00);
     addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetRelativeBal", 1.00);
     addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetRelativeSample", 1.00);
-    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JER", 1.00);
+    //addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JER", 1.00);
     
     // recoil correction, for Z+jets, W+jets, ggh and qqh (no W+jets in e+tau and mu+tau)
     // UES uncertainties, for MC without recoil correction
@@ -359,8 +355,8 @@ int main(int argc, char** argv) {
     // Z pt reweighting
     addshapes(&cb, file, cats, {"ZJ","fake"}, "CMS_Zpt_"+year, 1.00);
     
-    // top pt reweighting
-    addshapes(&cb, file, cats, {"ttbar","fake"}, "CMS_toppt_"+year, 1.00);
+    // top pt reweighting (no need to add if data/MC agreement is fairly good with nominal top pt sf applied)
+    //addshapes(&cb, file, cats, {"ttbar","fake"}, "CMS_toppt_"+year, 1.00);
     
     // tau tracking efficiency in embedded (on real tauh, no effect on fake bkg)
     if (channel=="et" or channel=="mt"){
