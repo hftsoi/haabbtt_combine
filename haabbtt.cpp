@@ -17,7 +17,7 @@ using namespace std;
 // Add shape unc only when template norms are positive
 // and when there are no negative bins in both Up and Down shapes
 // e.g. diboson has some negative genweights, fake estimation involves data/MC subtraction...
-void addshapes(ch::CombineHarvester* cb, TFile* input_file, ch::Categories categories, vector<string> proc_names, string syst_name, float init_value) {
+void addshapes(ch::CombineHarvester* cb, TFile* input_file, vector<pair<int,string>> categories, vector<string> proc_names, string syst_name, float init_value) {
     // Loop over categories
     for (auto categories_itn = categories.begin(); categories_itn != categories.end(); ++categories_itn) {
         string category_name = categories_itn->second;// ch::Categories is of the type vector<pair<int, string>>
@@ -81,6 +81,15 @@ int main(int argc, char** argv) {
     
     std::string channel = *(argv + 1);
     std::string year = *(argv + 2);
+    std::string ncats = *(argv + 3);
+    
+    // Take category names from inputs
+    cout << "Categories for " << channel << " " << year << ":" << endl;
+    std::vector<std::pair<int, std::string>> cats = {};
+    for (int i = 1; i <= stoi(ncats); i++) {
+        cats.push_back({i, *(argv + 3 + i)});
+        cout << cats[i-1].first << ": " << cats[i-1].second << endl;
+    }
     
     // Where the datacard is stored
     string aux_shapes = string(getenv("CMSSW_BASE")) + "/src/auxiliaries/shapes/";
@@ -90,16 +99,10 @@ int main(int argc, char** argv) {
     // cb.SetVerbosity(3);
     
     // List of categories (also called 'bins' in Combine)
-    ch::Categories cats = {
-        {1, "1"},
-        {2, "2"},
-        {3, "3"},
-        {4, "4"},
-        {5, "5"},
-        {6, "6"}
-    };
-    if (channel=="em" or channel=="mt") cats.push_back({7, "7"});
-    
+    //ch::Categories cats = {
+    //    {1, "1"},
+    //};
+     
     // List of mass points for the signal, the masses are added at the end of the signal string names
     //vector<string> masses = {"12","15","20","25","30","35","40","45","50","55","60"};
     vector<string> masses = {"35"};
@@ -202,8 +205,16 @@ int main(int argc, char** argv) {
     file = new TFile((aux_shapes+"final_"+channel+"_"+year+".root").c_str());// To be used for the addshapes function
     
     // btagging efficiency, no embedded
-    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_heavy_"+year, 1.00);
-    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_light_"+year, 1.00);
+    //addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_heavy_"+year, 1.00);
+    //addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_light_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_hf", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_lf", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_hfstats1_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_hfstats2_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_lfstats1_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_lfstats2_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_cferr1", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_btagsf_cferr2", 1.00);
     
     // Trigger efficiency
     if (channel=="et" or channel=="mt"){
@@ -328,8 +339,8 @@ int main(int argc, char** argv) {
     addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetHF", 1.00);
     addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetHF_"+year, 1.00);
     addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetRelativeBal", 1.00);
-    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetRelativeSample", 1.00);
-    //addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JER", 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JetRelativeSample_"+year, 1.00);
+    addshapes(&cb, file, cats, JoinStr({bkg_procs_noEMB_nofake,{"fake"},sig_ggh,sig_vbf}), "CMS_JER", 1.00);
     
     // recoil correction, for Z+jets, W+jets, ggh and qqh (no W+jets in e+tau and mu+tau)
     // UES uncertainties, for MC without recoil correction
